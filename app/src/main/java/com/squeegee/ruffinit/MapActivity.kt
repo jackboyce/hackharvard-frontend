@@ -19,8 +19,11 @@ import android.os.Bundle
 import android.os.Environment.DIRECTORY_PICTURES
 import android.support.v4.content.FileProvider
 import android.widget.Switch
+import com.getbase.floatingactionbutton.FloatingActionButton
+import com.getbase.floatingactionbutton.FloatingActionsMenu
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionDeniedResponse
@@ -58,24 +61,42 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
 
             mapFrag.getMapAsync {
                 map = it
+                map.isIndoorEnabled = false
+
+                Dexter.withActivity(this@MapActivity)
+                    .withPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                    .withListener(object: PermissionListener {
+                        override fun onPermissionGranted(response: PermissionGrantedResponse?) {
+                            try {
+                                LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
+                                    map.moveCamera(CameraUpdateFactory.newLatLng(LatLng(it.latitude, it.longitude)))
+                                }
+                                map.isMyLocationEnabled = true
+                            } catch (e: SecurityException) {
+                                e.printStackTrace()
+                            }
+                        }
+
+                        override fun onPermissionRationaleShouldBeShown(permission: PermissionRequest?, token: PermissionToken?) {
+                        }
+
+                        override fun onPermissionDenied(response: PermissionDeniedResponse?) {
+                        }
+                    })
 //                plotData()
             }
 
-            linearLayout {
-                button("Found") {
+            floatingActionsMenu {
+                elevation = dip(4).toFloat()
+                addButton(FloatingActionButton(ctx).apply {
+                    setIcon(R.drawable.ic_add)
+                    title = "Report Missing"
                     onClick { dispatchTakePictureIntent() }
-                }.lparams {
-                    weight = 1f
-                }
-                button("Missing") {
-                    onClick {
-
-                    }
-                }.lparams {
-                    weight = 1f
-                }
-            }.lparams(width=matchParent) {
+                })
+            }.lparams {
+                alignParentRight()
                 alignParentBottom()
+                margin = dip(20)
             }
         }
     }
@@ -190,17 +211,21 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
             val imageLength = imageStream!!.available()
 
             async(CommonPool) {
-                LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { loc ->
-                    val now = System.currentTimeMillis()
-                    val imageName = ImageManager.uploadImage(
-                        now.toString() + ImageManager.randomString(5),
-                        imageStream,
-                        imageLength.toLong(),
-                        LatLng(loc.latitude, loc.longitude)
-                    )
-                    async(UI) {
-                        toast("Image Uploaded Successfully. Name = " + imageName)
+                try {
+                    LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { loc ->
+                        val now = System.currentTimeMillis()
+                        val imageName = ImageManager.uploadImage(
+                            now.toString() + ImageManager.randomString(5),
+                            imageStream,
+                            imageLength.toLong(),
+                            LatLng(loc.latitude, loc.longitude)
+                        )
+                        async(UI) {
+                            toast("Image Uploaded Successfully. Name = " + imageName)
+                        }
                     }
+                } catch (e: SecurityException) {
+                    e.printStackTrace()
                 }
             }
         } catch (e: Exception) {
