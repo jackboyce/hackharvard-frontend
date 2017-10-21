@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/RuffinIt.iml" filepath="$PROJECT_DIR$/RuffinIt.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/hackharvard-frontend.iml" filepath="$PROJECT_DIR$/hackharvard-frontend.iml" />
     </modules>
   </component>
 </project>

@@ -8,7 +8,7 @@ apply plugin: 'kotlin-kapt'
 
 android {
     compileSdkVersion 26
-    buildToolsVersion "26.0.1"
+    buildToolsVersion '26.0.2'
     defaultConfig {
         applicationId "com.squeegee.ruffinit"
         minSdkVersion 19
@@ -50,5 +50,7 @@ dependencies {
     compile "org.jetbrains.anko:anko-appcompat-v7-coroutines:$anko_version"
 
     // Google
+    //compile 'com.google.android.gms:play-services:11.4.2'
     compile "com.google.android.gms:play-services-maps:11.4.2"
+
 }
