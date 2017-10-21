@@ -3,28 +3,27 @@ package com.squeegee.ruffinit
 import android.Manifest
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Bitmap
+import android.graphics.Color
 import android.location.Location
 import android.provider.MediaStore
 import android.view.View
 import android.view.ViewManager
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
 import org.jetbrains.anko.sdk25.coroutines.onClick
 import android.net.Uri
 import android.os.Bundle
 
 import android.os.Environment.DIRECTORY_PICTURES
 import android.support.v4.content.FileProvider
-import android.support.v7.widget.SwitchCompat
 import android.widget.Switch
+import android.widget.Toast
+import com.bumptech.glide.Glide
 import com.getbase.floatingactionbutton.FloatingActionButton
-import com.getbase.floatingactionbutton.FloatingActionsMenu
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.*
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionDeniedResponse
@@ -36,14 +35,11 @@ import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
 import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.*
-import org.jetbrains.anko.appcompat.v7.switchCompat
 
-
-class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
+class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks, GoogleMap.OnInfoWindowClickListener , GoogleMap.InfoWindowAdapter{
 
     val REQUEST_IMAGE_CAPTURE = 1
     lateinit var map: GoogleMap
@@ -64,6 +60,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
 
             mapFrag.getMapAsync {
                 map = it
+                map.setOnInfoWindowClickListener(this@MapActivity);
                 map.isIndoorEnabled = false
 //                plotData()
             }
@@ -133,13 +130,42 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
 
     fun plotData(loc: Location) {
         val nearby = Report.retrieveNearby(LatLng(loc.latitude, loc.longitude))
-        nearby.forEach {
+        nearby.forEach { outer ->
             // TODO: Use (poly)lines to connect very similar reports.
+            nearby.forEach { inner ->
+                var line: Polyline = map.addPolyline(PolylineOptions()
+                        .add(outer.location, inner.location)
+                        .width(5f)
+                        .color(Color.RED));
+            }
+
             map.addMarker(MarkerOptions()
-                .position(it.location)
-                .visible(true)
-            )
+                    .position(outer.location)
+                    .visible(true)
+                    .title(outer.imageUrl))
+            map.setInfoWindowAdapter(this)
         }
+    }
+
+    override fun getInfoContents(p0: Marker?): View {
+        return AnkoContext.create(ctx, this).linearLayout {
+            //imageView()
+            var imView = imageView {
+
+            }.lparams(width=dip(100), height=dip(100))
+
+            Glide.with(this).load(p0?.title).into(imView)
+        }
+    }
+
+
+    override fun getInfoWindow(p0: Marker?): View? {
+        return null
+    }
+
+    override fun onInfoWindowClick(p0: Marker?) {
+        Toast.makeText(this, "Info window clicked",
+                Toast.LENGTH_SHORT).show();
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
