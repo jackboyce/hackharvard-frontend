@@ -13,8 +13,6 @@
         android:name="com.google.android.geo.API_KEY"
         android:value="AIzaSyC1d5upnkC_kbBc-jI5Eys12wP8T8s5cqU" />
 
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-
 
     <application
         android:allowBackup="true"

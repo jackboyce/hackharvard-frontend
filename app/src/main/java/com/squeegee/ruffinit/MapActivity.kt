@@ -18,6 +18,7 @@ import android.os.Bundle
 
 import android.os.Environment.DIRECTORY_PICTURES
 import android.support.v4.content.FileProvider
+import android.support.v7.widget.SwitchCompat
 import android.widget.Switch
 import com.getbase.floatingactionbutton.FloatingActionButton
 import com.getbase.floatingactionbutton.FloatingActionsMenu
@@ -39,6 +40,7 @@ import kotlinx.coroutines.experimental.Deferred
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.*
+import org.jetbrains.anko.appcompat.v7.switchCompat
 
 
 class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
@@ -49,6 +51,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
     lateinit var imageUri: Uri
     val REQUEST_TAKE_PHOTO = 1
     private lateinit var gapi: GoogleApiClient
+    private var currentLoc: LatLng? = null
 
     override fun createView(manager: ViewManager): View {
         return manager.relativeLayout {
@@ -62,27 +65,6 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
             mapFrag.getMapAsync {
                 map = it
                 map.isIndoorEnabled = false
-
-                Dexter.withActivity(this@MapActivity)
-                    .withPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                    .withListener(object: PermissionListener {
-                        override fun onPermissionGranted(response: PermissionGrantedResponse?) {
-                            try {
-                                LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
-                                    map.moveCamera(CameraUpdateFactory.newLatLng(LatLng(it.latitude, it.longitude)))
-                                }
-                                map.isMyLocationEnabled = true
-                            } catch (e: SecurityException) {
-                                e.printStackTrace()
-                            }
-                        }
-
-                        override fun onPermissionRationaleShouldBeShown(permission: PermissionRequest?, token: PermissionToken?) {
-                        }
-
-                        override fun onPermissionDenied(response: PermissionDeniedResponse?) {
-                        }
-                    })
 //                plotData()
             }
 
@@ -128,7 +110,9 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
                     try {
                         LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
                             plotData(it)
+                            map.animateCamera(CameraUpdateFactory.newLatLng(LatLng(it.latitude, it.longitude)))
                         }
+                        map.isMyLocationEnabled = true
                     } catch (e: SecurityException) {
                         e.printStackTrace()
                     }
@@ -140,6 +124,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
                 override fun onPermissionDenied(response: PermissionDeniedResponse?) {
                 }
             })
+            .check()
     }
 
     override fun onConnectionSuspended(reason: Int) {
@@ -147,7 +132,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
     }
 
     fun plotData(loc: Location) {
-        val nearby = Report.retrieveNearby(LatLng(loc.latitude, loc.longitude), 50.0)
+        val nearby = Report.retrieveNearby(LatLng(loc.latitude, loc.longitude))
         nearby.forEach {
             // TODO: Use (poly)lines to connect very similar reports.
             map.addMarker(MarkerOptions()
@@ -157,11 +142,14 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
-            val extras = data.extras
 //            val imageBitmap = extras!!.get("data") as Bitmap
-            uploadImage(imageUri)
+            val name = uploadImage(imageUri)
+            fillInfoDialog(Report(
+                imageUrl = name,
+                location = currentLoc ?: LatLng(0.0, 0.0)
+            ))
         }
     }
 
@@ -180,9 +168,9 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
 
             // Continue only if the File was successfully created
             if (photoFile != null) {
-                val photoURI: Uri = FileProvider.getUriForFile(this, "com.example.android.fileprovider", photoFile);
-                imageUri = photoURI
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                imageUri = FileProvider.getUriForFile(this, "com.example.android.fileprovider", photoFile)
+//                imageUri = Uri.parse(photoFile.absolutePath)
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri)
                 startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO)
             }
         }
@@ -193,44 +181,43 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
         // Create an image file name
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
         val imageFileName = "JPEG_" + timeStamp + "_"
-        val storageDir = getExternalFilesDir(DIRECTORY_PICTURES)
-        val image = File.createTempFile(
-            imageFileName, // prefix
-            ".jpg", // extension
-            storageDir
-        )
+        val image = getExternalFilesDir(DIRECTORY_PICTURES).resolve("ruffin_it/$imageFileName.jpg")
+        image.mkdirs()
+        image.createNewFile()
 
         // Save a file: path for use with ACTION_VIEW intents
         mCurrentPhotoPath = image.absolutePath
         return image
     }
 
-    private fun uploadImage(uri: Uri) {
+    private fun uploadImage(uri: Uri): String {
+        val now = System.currentTimeMillis()
+        val imageName = now.toString() + ImageManager.randomString(5)
         try {
             val imageStream = contentResolver.openInputStream(uri)
             val imageLength = imageStream!!.available()
 
             async(CommonPool) {
-                try {
-                    LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { loc ->
-                        val now = System.currentTimeMillis()
-                        val imageName = ImageManager.uploadImage(
-                            now.toString() + ImageManager.randomString(5),
+//                try {
+//                    LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { loc ->
+                        ImageManager.uploadImage(
+                            imageName,
                             imageStream,
-                            imageLength.toLong(),
-                            LatLng(loc.latitude, loc.longitude)
+                            imageLength.toLong()
                         )
+
                         async(UI) {
                             toast("Image Uploaded Successfully. Name = " + imageName)
                         }
-                    }
-                } catch (e: SecurityException) {
-                    e.printStackTrace()
-                }
+//                    }
+//                } catch (e: SecurityException) {
+//                    e.printStackTrace()
+//                }
             }
         } catch (e: Exception) {
             if (e.message != null) toast(e.message!!)
         }
+        return imageName
     }
 
     fun fillInfoDialog(report: Report) {
@@ -238,11 +225,13 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
             var neutered: Switch? = null
             var injured: Switch? = null
             customView {
-                neutered = switch {
-                    text = "Neutered?"
-                }
-                injured = switch {
-                    text = "Injured?"
+                verticalLayout {
+                    neutered = switch {
+                        text = "Neutered?"
+                    }
+                    injured = switch {
+                        text = "Injured?"
+                    }
                 }
             }
 

@@ -33,7 +33,7 @@ object ImageManager {
     private var rnd = SecureRandom()
 
     @Throws(Exception::class)
-    fun uploadImage(name: String, image: InputStream, imageLength: Long, location: LatLng): String {
+    fun uploadImage(name: String, image: InputStream, imageLength: Long): String {
         val container = container
 
         container.createIfNotExists()

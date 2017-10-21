@@ -17,7 +17,11 @@ data class Report(
          * @param loc location to search for nearby stray animals
          * @param radius in miles to search away from the current location
          */
-        fun retrieveNearby(loc: LatLng, radius: Double): List<Report> {
+        fun retrieveNearby(loc: LatLng): List<Report> {
+            val width = 5.0
+            val height = 5.0
+            val left = loc.latitude - width / 2.0
+            val top = loc.longitude - height / 2.0
             return listOf()
         }
     }
