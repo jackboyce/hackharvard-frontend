@@ -64,4 +64,8 @@ dependencies {
     // Http
     implementation "khttp:khttp:0.1.0"
     implementation 'com.github.salomonbrys.kotson:kotson:2.5.0'
+
+    //Glide
+    compile 'com.github.bumptech.glide:glide:4.2.0'
+    kapt 'com.github.bumptech.glide:compiler:4.2.0'
 }

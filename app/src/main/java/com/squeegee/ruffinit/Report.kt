@@ -10,6 +10,7 @@ import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.toast
 import java.io.File
 
+
 data class Animal(
     var reports: List<Report> = listOf()
 ) {
@@ -105,7 +106,7 @@ data class Animal(
  */
 data class Report(
     var localUrl: String = "",
-    var remoteUrl: String = "",
+    var remoteUrl: String = "https://googlechrome.github.io/samples/picture-element/images/butterfly.jpg",
     var location: LatLng = LatLng(0.0, 0.0),
     var timestamp: Long = System.currentTimeMillis(),
     var extraInfo: ReportInfo? = null,
