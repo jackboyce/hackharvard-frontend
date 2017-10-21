@@ -1,5 +1,6 @@
 package com.squeegee.ruffinit
 
+import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
@@ -20,6 +21,12 @@ import android.support.v4.content.FileProvider
 import android.widget.Switch
 import com.google.android.gms.common.api.GoogleApiClient
 import com.google.android.gms.location.LocationServices
+import com.karumi.dexter.Dexter
+import com.karumi.dexter.PermissionToken
+import com.karumi.dexter.listener.PermissionDeniedResponse
+import com.karumi.dexter.listener.PermissionGrantedResponse
+import com.karumi.dexter.listener.PermissionRequest
+import com.karumi.dexter.listener.single.PermissionListener
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -93,9 +100,25 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
 
     override fun onConnected(b: Bundle?) {
         // TODO: Do runtime permission request
-        LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
-            plotData(it)
-        }
+        Dexter.withActivity(this)
+            .withPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+            .withListener(object: PermissionListener {
+                override fun onPermissionGranted(response: PermissionGrantedResponse?) {
+                    try {
+                        LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
+                            plotData(it)
+                        }
+                    } catch (e: SecurityException) {
+                        e.printStackTrace()
+                    }
+                }
+
+                override fun onPermissionRationaleShouldBeShown(permission: PermissionRequest?, token: PermissionToken?) {
+                }
+
+                override fun onPermissionDenied(response: PermissionDeniedResponse?) {
+                }
+            })
     }
 
     override fun onConnectionSuspended(reason: Int) {
@@ -185,7 +208,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
         }
     }
 
-    fun fillInfoDialog(report: Report): Deferred<ReportInfo> {
+    fun fillInfoDialog(report: Report) {
         alert("Optional Extra Info") {
             var neutered: Switch? = null
             var injured: Switch? = null

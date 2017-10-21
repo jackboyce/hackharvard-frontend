@@ -28,7 +28,7 @@ android {
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation"org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
-    implementation 'com.android.support:appcompat-v7:26.0.0-beta1'
+    implementation 'com.android.support:appcompat-v7:26.1.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:0.5'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:2.2.2'
@@ -55,4 +55,7 @@ dependencies {
 
     //Azure
     compile 'com.microsoft.azure.android:azure-storage-android:2.0.0@aar'
+
+    // Permissions
+    implementation 'com.karumi:dexter:4.1.0'
 }
