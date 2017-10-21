@@ -48,7 +48,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
     val REQUEST_IMAGE_CAPTURE = 1
     lateinit var map: GoogleMap
     lateinit var mCurrentPhotoPath: String
-    lateinit var imageUri: Uri
+    var imageFile: File? = null
     val REQUEST_TAKE_PHOTO = 1
     private lateinit var gapi: GoogleApiClient
     private var currentLoc: LatLng? = null
@@ -109,8 +109,9 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
                 override fun onPermissionGranted(response: PermissionGrantedResponse?) {
                     try {
                         LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
+                            currentLoc = LatLng(it.latitude, it.longitude)
                             plotData(it)
-                            map.animateCamera(CameraUpdateFactory.newLatLng(LatLng(it.latitude, it.longitude)))
+                            map.animateCamera(CameraUpdateFactory.newLatLng(currentLoc))
                         }
                         map.isMyLocationEnabled = true
                     } catch (e: SecurityException) {
@@ -132,22 +133,25 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
     }
 
     fun plotData(loc: Location) {
-        val nearby = Report.retrieveNearby(LatLng(loc.latitude, loc.longitude))
+        val nearby = Animal.retrieveNearby(LatLng(loc.latitude, loc.longitude))
         nearby.forEach {
             // TODO: Use (poly)lines to connect very similar reports.
-            map.addMarker(MarkerOptions()
-                .position(it.location)
-                .visible(true)
-            )
+            it.reports.forEach {
+                map.addMarker(MarkerOptions()
+                    .position(it.location)
+                    .visible(true)
+                )
+            }
         }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
 //            val imageBitmap = extras!!.get("data") as Bitmap
-            val name = uploadImage(imageUri)
+//            val name = uploadImage(Uri.parse(imageFile!!.absolutePath))
             fillInfoDialog(Report(
-                imageUrl = name,
+                localUrl = imageFile!!.absolutePath,
+                remoteUrl = imageFile!!.name, // TODO: Add server prefix
                 location = currentLoc ?: LatLng(0.0, 0.0)
             ))
         }
@@ -159,7 +163,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
         // Ensure that there's a camera activity to handle the intent
         if (takePictureIntent.resolveActivity(packageManager) != null) {
             // Create the File where the photo should go
-            val photoFile: File? = try {
+            imageFile = try {
                 createImageFile()
             } catch (ex: IOException) {
                 // Error occurred while creating the File
@@ -167,10 +171,10 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
             }
 
             // Continue only if the File was successfully created
-            if (photoFile != null) {
-                imageUri = FileProvider.getUriForFile(this, "com.example.android.fileprovider", photoFile)
+            if (imageFile != null) {
+                val uri = FileProvider.getUriForFile(this, "com.example.android.fileprovider", imageFile)
 //                imageUri = Uri.parse(photoFile.absolutePath)
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri)
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
                 startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO)
             }
         }
@@ -179,10 +183,10 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
     @Throws(IOException::class)
     private fun createImageFile(): File {
         // Create an image file name
-        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
-        val imageFileName = "JPEG_" + timeStamp + "_"
+//        val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss").format(Date())
+        val imageFileName = "${System.currentTimeMillis()}_${currentLoc!!.latitude}_${currentLoc!!.longitude}"
+        getExternalFilesDir(DIRECTORY_PICTURES).resolve("ruffin_it/").mkdirs()
         val image = getExternalFilesDir(DIRECTORY_PICTURES).resolve("ruffin_it/$imageFileName.jpg")
-        image.mkdirs()
         image.createNewFile()
 
         // Save a file: path for use with ACTION_VIEW intents
@@ -240,7 +244,7 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
                     neutered = neutered!!.isChecked,
                     injured = injured!!.isChecked
                 )
-                report.publish()
+                async(CommonPool) { report.publish(ctx) }
             }
             negativeButton("Cancel") {}
         }.show()
