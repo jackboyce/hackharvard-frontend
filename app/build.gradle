@@ -53,4 +53,6 @@ dependencies {
     //compile 'com.google.android.gms:play-services:11.4.2'
     compile "com.google.android.gms:play-services-maps:11.4.2"
 
+    //Azure
+    compile 'com.microsoft.azure.android:azure-storage-android:2.0.0@aar'
 }
