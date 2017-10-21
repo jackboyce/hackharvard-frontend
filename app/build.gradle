@@ -36,6 +36,8 @@ dependencies {
     compile 'com.marcinmoskala.activitystarter:activitystarter:1.00'
     kapt 'com.marcinmoskala.activitystarter:activitystarter-compiler:1.00'
 
+    compile 'io.reactivex.rxjava2:rxkotlin:2.1.0'
+
     // Anko Commons
     compile "org.jetbrains.anko:anko-commons:$anko_version"
 
