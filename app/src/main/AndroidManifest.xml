@@ -20,7 +20,9 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme" >
 
-        <activity android:name=".MainActivity">
+        <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyC1d5upnkC_kbBc-jI5Eys12wP8T8s5cqU"/>
+
+        <activity android:name=".MapActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
