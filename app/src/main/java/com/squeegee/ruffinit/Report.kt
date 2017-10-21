@@ -52,50 +52,59 @@ data class Animal(
             val top = loc.longitude - height / 2.0
             val right = loc.latitude + width / 2.0
             val bottom = loc.longitude + height / 2.0
-            val res = JsonParser().parse(khttp.get("http://40.71.253.77:8080", params = mapOf(
-                "left" to left.toString(),
-                "top" to top.toString(),
-                "right" to right.toString(),
-                "bottom" to bottom.toString()
-            )).text).obj
+            return try {
+                val res = JsonParser().parse(khttp.get("http://40.71.253.77:8080", params = mapOf(
+                    "left" to left.toString(),
+                    "top" to top.toString(),
+                    "right" to right.toString(),
+                    "bottom" to bottom.toString()
+                )).text).obj
 
-            return res["animals"].array.map { it.obj }.map {
-                Animal(reports = it["reports"].array.map { it.obj }.map {
-                    Report(
-                        localUrl = "",
-                        remoteUrl = it["imageUrl"].string,
-                        location = LatLng(it["location"][0].double, it["location"][1].double),
-                        timestamp = it["timestamp"].long,
-                        extraInfo = ReportInfo(
-                            it["neutered"].bool,
-                            it["injured"].bool
-                        ),
-                        state = it["state"].string,
-                        type = Report.Type.valueOf(it["type"].string)
-                    )
-                })
+                res["animals"].array.map { it.obj }.map {
+                    Animal(reports = it["reports"].array.map { it.obj }.map {
+                        Report(
+                            localUrl = "",
+                            remoteUrl = it["imageUrl"].string,
+                            location = LatLng(it["location"][0].double, it["location"][1].double),
+                            timestamp = it["timestamp"].long,
+                            extraInfo = ReportInfo(
+                                it["neutered"].bool,
+                                it["injured"].bool
+                            ),
+                            state = it["state"].string,
+                            type = Report.Type.valueOf(it["type"].string)
+                        )
+                    })
+                }
+            } catch (e: Exception) {
+                listOf()
             }
         }
 
         fun byState(state: String): List<Animal> {
-            val res = JsonParser().parse(khttp.get("http://40.71.253.77:8080", params = mapOf(
-                "state" to state
-            )).text).obj
-            return res["animals"].array.map { it.obj }.map {
-                Animal(reports = it["reports"].array.map { it.obj }.map {
-                    Report(
-                        localUrl = "",
-                        remoteUrl = it["imageUrl"].string,
-                        location = LatLng(it["location"][0].double, it["location"][1].double),
-                        timestamp = it["timestamp"].long,
-                        extraInfo = ReportInfo(
-                            it["neutered"].bool,
-                            it["injured"].bool
-                        ),
-                        state = it["state"].string,
-                        type = Report.Type.valueOf(it["type"].string)
-                    )
-                })
+            return try {
+                val res = JsonParser().parse(khttp.get("http://40.71.253.77:8080", params = mapOf(
+                    "state" to state
+                )).text).obj
+
+                res["animals"].array.map { it.obj }.map {
+                    Animal(reports = it["reports"].array.map { it.obj }.map {
+                        Report(
+                            localUrl = "",
+                            remoteUrl = it["imageUrl"].string,
+                            location = LatLng(it["location"][0].double, it["location"][1].double),
+                            timestamp = it["timestamp"].long,
+                            extraInfo = ReportInfo(
+                                it["neutered"].bool,
+                                it["injured"].bool
+                            ),
+                            state = it["state"].string,
+                            type = Report.Type.valueOf(it["type"].string)
+                        )
+                    })
+                }
+            } catch (e: Exception) {
+                listOf()
             }
         }
     }

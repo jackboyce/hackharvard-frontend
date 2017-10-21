@@ -16,6 +16,7 @@ import android.os.Bundle
 
 import android.os.Environment.DIRECTORY_PICTURES
 import android.support.v4.content.FileProvider
+import android.view.Gravity
 import android.widget.Switch
 import android.widget.Toast
 import com.bumptech.glide.Glide
@@ -38,6 +39,7 @@ import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.*
+import org.jetbrains.anko.recyclerview.v7.recyclerView
 
 class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks, GoogleMap.OnInfoWindowClickListener , GoogleMap.InfoWindowAdapter{
 
@@ -49,8 +51,12 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks, GoogleMa
     private lateinit var gapi: GoogleApiClient
     private var currentLoc: LatLng? = null
 
-    override fun createView(manager: ViewManager): View {
-        return manager.relativeLayout {
+    override fun createView(manager: ViewManager): View = manager.slidingUpPanelLayout {
+        setGravity(Gravity.BOTTOM)
+        panelHeight = dip(64)
+
+        // Main content
+        relativeLayout {
             id = R.id.contentPanel
 
             val mapFrag = SupportMapFragment.newInstance()
@@ -68,14 +74,22 @@ class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks, GoogleMa
             floatingActionsMenu {
                 elevation = dip(4).toFloat()
                 addButton(FloatingActionButton(ctx).apply {
-                    setIcon(R.drawable.ic_add)
-                    title = "Report Missing"
+                    setIcon(R.drawable.ic_camera_alt)
+                    post { title = "Report Missing" }
                     onClick { dispatchTakePictureIntent() }
                 })
             }.lparams {
                 alignParentRight()
                 alignParentBottom()
                 margin = dip(20)
+            }
+        }
+
+        // Bottom panel
+        verticalLayout {
+            textView("Reported Lost")
+            recyclerView {
+
             }
         }
     }
