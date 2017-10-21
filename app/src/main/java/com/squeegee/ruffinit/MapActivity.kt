@@ -142,6 +142,7 @@ class MapActivity: BaseActivity() {
                         ).show()
                     })
 
+
                 } catch (ex: Exception) {
                     val exceptionMessage = ex.message
                     handler.post(Runnable { Toast.makeText(this@MapActivity, exceptionMessage, Toast.LENGTH_SHORT).show() })
