@@ -2,6 +2,8 @@ package com.squeegee.ruffinit
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.location.Location
 import android.provider.MediaStore
 import android.view.View
 import android.view.ViewManager
@@ -9,38 +11,37 @@ import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import org.jetbrains.anko.button
-import org.jetbrains.anko.editText
 import org.jetbrains.anko.sdk25.coroutines.onClick
-import org.jetbrains.anko.toast
-import org.jetbrains.anko.verticalLayout
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 
 import android.os.Environment.DIRECTORY_PICTURES
-import android.os.Handler
 import android.support.v4.content.FileProvider
+import android.widget.Switch
+import com.google.android.gms.common.api.GoogleApiClient
+import com.google.android.gms.location.LocationServices
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.*
-import android.widget.Toast
+import kotlinx.coroutines.experimental.CommonPool
+import kotlinx.coroutines.experimental.Deferred
+import kotlinx.coroutines.experimental.android.UI
+import kotlinx.coroutines.experimental.async
+import org.jetbrains.anko.*
 
 
+class MapActivity: BaseActivity(), GoogleApiClient.ConnectionCallbacks {
 
-
-class MapActivity: BaseActivity() {
-
-    val REQUEST_IMAGE_CAPTURE = 1;
+    val REQUEST_IMAGE_CAPTURE = 1
     lateinit var map: GoogleMap
     lateinit var mCurrentPhotoPath: String
     lateinit var imageUri: Uri
-    val REQUEST_TAKE_PHOTO = 1;
+    val REQUEST_TAKE_PHOTO = 1
+    private lateinit var gapi: GoogleApiClient
 
     override fun createView(manager: ViewManager): View {
-        return manager.verticalLayout {
+        return manager.relativeLayout {
             id = R.id.contentPanel
 
             val mapFrag = SupportMapFragment.newInstance()
@@ -50,56 +51,95 @@ class MapActivity: BaseActivity() {
 
             mapFrag.getMapAsync {
                 map = it
-                afterLoad()
+//                plotData()
             }
 
-            button("Camera") {
-                onClick { dispatchTakePictureIntent() }
-            }
-            button("Print location") {
-                onClick {
-                    System.out.println(mCurrentPhotoPath)
-                    UploadImage()
+            linearLayout {
+                button("Found") {
+                    onClick { dispatchTakePictureIntent() }
+                }.lparams {
+                    weight = 1f
                 }
+                button("Missing") {
+                    onClick {
+
+                    }
+                }.lparams {
+                    weight = 1f
+                }
+            }.lparams(width=matchParent) {
+                alignParentBottom()
             }
         }
     }
 
-    fun afterLoad() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        gapi = GoogleApiClient.Builder(this)
+            .addApi(LocationServices.API)
+            .addConnectionCallbacks(this)
+            .build()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        gapi.connect()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        gapi.disconnect()
+    }
+
+    override fun onConnected(b: Bundle?) {
+        // TODO: Do runtime permission request
+        LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener {
+            plotData(it)
+        }
+    }
+
+    override fun onConnectionSuspended(reason: Int) {
 
     }
 
-    fun addCoordinate(lat: Double, lon: Double, str: String) {
-        map.addMarker(MarkerOptions().position(LatLng(lat, lon)).title(str))
+    fun plotData(loc: Location) {
+        val nearby = Report.retrieveNearby(LatLng(loc.latitude, loc.longitude), 50.0)
+        nearby.forEach {
+            // TODO: Use (poly)lines to connect very similar reports.
+            map.addMarker(MarkerOptions()
+                .position(it.location)
+                .visible(true)
+            )
+        }
     }
 
-//    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
-//        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
-//            val extras = data.extras
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == Activity.RESULT_OK) {
+            val extras = data.extras
 //            val imageBitmap = extras!!.get("data") as Bitmap
-//            mImageView.setImageBitmap(imageBitmap)
-//        }
-//    }
+            uploadImage(imageUri)
+        }
+    }
 
 
     private fun dispatchTakePictureIntent() {
-        var takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         // Ensure that there's a camera activity to handle the intent
-        if (takePictureIntent.resolveActivity(getPackageManager()) != null) {
+        if (takePictureIntent.resolveActivity(packageManager) != null) {
             // Create the File where the photo should go
-            var photoFile: File? = null;
-            try {
-                photoFile = createImageFile();
+            val photoFile: File? = try {
+                createImageFile()
             } catch (ex: IOException) {
                 // Error occurred while creating the File
-                throw IOException("ERROR")
+                null
             }
+
             // Continue only if the File was successfully created
             if (photoFile != null) {
-                var photoURI: Uri = FileProvider.getUriForFile(this, "com.example.android.fileprovider", photoFile);
+                val photoURI: Uri = FileProvider.getUriForFile(this, "com.example.android.fileprovider", photoFile);
                 imageUri = photoURI
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI);
-                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO);
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoURI)
+                startActivityForResult(takePictureIntent, REQUEST_TAKE_PHOTO)
             }
         }
     }
@@ -111,49 +151,66 @@ class MapActivity: BaseActivity() {
         val imageFileName = "JPEG_" + timeStamp + "_"
         val storageDir = getExternalFilesDir(DIRECTORY_PICTURES)
         val image = File.createTempFile(
-                imageFileName, /* prefix */
-                ".jpg", /* suffix */
-                storageDir      /* directory */
+            imageFileName, // prefix
+            ".jpg", // extension
+            storageDir
         )
 
         // Save a file: path for use with ACTION_VIEW intents
-        mCurrentPhotoPath = image.getAbsolutePath()
+        mCurrentPhotoPath = image.absolutePath
         return image
     }
 
-    private fun UploadImage() {
+    private fun uploadImage(uri: Uri) {
         try {
-            val imageStream = contentResolver.openInputStream(this.imageUri)
+            val imageStream = contentResolver.openInputStream(uri)
             val imageLength = imageStream!!.available()
 
-            val handler = Handler()
-
-            val th = Thread(Runnable {
-                try {
-
-                    val imageName = ImageManager.UploadImage(imageStream, imageLength)
-
-
-                    handler.post(Runnable {
-                        Toast.makeText(
-                                this@MapActivity,
-                                "Image Uploaded Successfully. Name = " + imageName,
-                                Toast.LENGTH_SHORT
-                        ).show()
-                    })
-
-
-                } catch (ex: Exception) {
-                    val exceptionMessage = ex.message
-                    handler.post(Runnable { Toast.makeText(this@MapActivity, exceptionMessage, Toast.LENGTH_SHORT).show() })
+            async(CommonPool) {
+                LocationServices.getFusedLocationProviderClient(ctx).lastLocation.addOnSuccessListener { loc ->
+                    val now = System.currentTimeMillis()
+                    val imageName = ImageManager.uploadImage(
+                        now.toString() + ImageManager.randomString(5),
+                        imageStream,
+                        imageLength.toLong(),
+                        LatLng(loc.latitude, loc.longitude)
+                    )
+                    async(UI) {
+                        toast("Image Uploaded Successfully. Name = " + imageName)
+                    }
                 }
-            })
-            th.start()
-        } catch (ex: Exception) {
-
-            Toast.makeText(this, ex.message, Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            if (e.message != null) toast(e.message!!)
         }
-
     }
 
+    fun fillInfoDialog(report: Report): Deferred<ReportInfo> {
+        alert("Optional Extra Info") {
+            var neutered: Switch? = null
+            var injured: Switch? = null
+            customView {
+                neutered = switch {
+                    text = "Neutered?"
+                }
+                injured = switch {
+                    text = "Injured?"
+                }
+            }
+
+            positiveButton("Report Animal") {
+                report.extraInfo = ReportInfo(
+                    neutered = neutered!!.isChecked,
+                    injured = injured!!.isChecked
+                )
+                report.publish()
+            }
+            negativeButton("Cancel") {}
+        }.show()
+    }
 }
+
+data class ReportInfo(
+    val neutered: Boolean = false,
+    val injured: Boolean = false
+)
