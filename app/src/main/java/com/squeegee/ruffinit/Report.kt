@@ -5,14 +5,17 @@ import android.location.Geocoder
 import com.github.salomonbrys.kotson.*
 import com.google.android.gms.maps.model.LatLng
 import com.google.gson.JsonParser
+import khttp.get
+import kotlinx.coroutines.experimental.CommonPool
 import kotlinx.coroutines.experimental.android.UI
 import kotlinx.coroutines.experimental.async
 import org.jetbrains.anko.toast
+import org.json.JSONObject
 import java.io.File
 
 
 data class Animal(
-    var reports: List<Report> = listOf()
+    var reports: List<Report> = listOf(Report(location=LatLng(42.361145, -71.057083)))
 ) {
     companion object {
         /*
@@ -115,12 +118,13 @@ data class Animal(
  */
 data class Report(
     var localUrl: String = "",
-    var remoteUrl: String = "https://googlechrome.github.io/samples/picture-element/images/butterfly.jpg",
+    var remoteUrl: String = "",
     var location: LatLng = LatLng(0.0, 0.0),
     var timestamp: Long = System.currentTimeMillis(),
     var extraInfo: ReportInfo? = null,
     var state: String = "",
-    var type: Report.Type = Type.SIGHTING
+    var type: Report.Type = Type.SIGHTING,
+    var id: Int = 0
 ) {
 
     enum class Type {
@@ -129,6 +133,22 @@ data class Report(
         FOUND
     }
 
+    fun Report(id: String) {
+        this.id = id.toInt()
+
+        async(CommonPool) {
+            var data: JSONObject = get("http://40.71.253.77:8080/get_dog_by_id/" + id) as JSONObject
+            println(data)
+
+            async(UI) {
+                remoteUrl = data.get("img_url") as String
+                location = LatLng((data.get("geo_lat") as String).toDouble(), (data.get("geo_long") as String).toDouble())
+                timestamp = (data.get("timestamp_img") as String).toLong()
+                state = data.get("state") as String
+            }
+
+        }
+    }
     /**
      * Publish this report to the server.
      * 1. Uploads the image (?)
@@ -152,15 +172,24 @@ data class Report(
         val state = if (addrs.isNotEmpty()) {
            addrs.first().adminArea
         } else null
-
-        khttp.post("http://40.71.253.77:8080", data = jsonObject(
-            "imageUrl" to remoteUrl,
-            "location" to jsonArray(location.latitude, location.longitude),
-            "timestamp" to timestamp,
-            "neutered" to extraInfo?.neutered,
-            "injured" to extraInfo?.injured,
-            "type" to type.toString(),
-            "state" to state
-        ).toString())
+        val payload = mapOf("img_url" to "https://hackharvarddiag310.blob.core.windows.net/images/" + remoteUrl,
+                "geo_long" to location.longitude,
+                "geo_lat" to location.latitude,
+                "timestamp_img" to timestamp/1000,
+                "neutered" to (if (extraInfo!!.neutered) 1 else 0),
+                "injured" to ( if (extraInfo!!.injured) 1 else 0),
+                "type" to type.toString(),
+                "state" to state)
+//        khttp.post("http://40.71.253.77:8080/insert_dog", data = jsonObject(
+//            "imageUrl" to remoteUrl,
+//            "location" to jsonArray(location.latitude, location.longitude),
+//            "timestamp" to timestamp,
+//            "neutered" to extraInfo?.neutered,
+//            "injured" to extraInfo?.injured,
+//            "type" to type.toString(),
+//            "state" to state
+//        ).toString())
+//        geo_long : longitude, geo_lat: lat, img_url: image url, timestamp_img : timstamp (epcoh), nuetered: boolean, type: {SIGHTING, MISSING, FOUND}
+        khttp.post("http://40.71.253.77:8080/insert_dog", data=payload)
     }
 }
